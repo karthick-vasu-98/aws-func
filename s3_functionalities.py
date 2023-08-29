@@ -1,4 +1,6 @@
-import fnmatch
+'''
+The functions to create, read, delete in AWS s3 using botocore module
+'''
 from io import StringIO
 import botocore.session
 
