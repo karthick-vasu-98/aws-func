@@ -1,8 +1,15 @@
 '''
 The functions to create, read, delete in AWS s3 using botocore module
 '''
+import json
+import datetime
+import boto3
 from io import StringIO
 import botocore.session
+from botocore.exceptions import NoCredentialsError
+
+
+s3 = boto3.client('s3')
 
 def get_aws_session():
     return botocore.session.get_session()
@@ -72,8 +79,72 @@ def delete_s3_folder_items(uri):
             msg = 'Success'
     return result, msg
 
+def set_bucket_policy(bucket_name):
+    bucket_policy = {
+    "Version": "2012-10-17",
+    "Statement": [
+        {
+            "Effect": "Allow",
+            "Principal": "*",
+            "Action": "s3:GetObject",
+            "Resource": f"arn:aws:s3:::{bucket_name}/*"
+        }
+        ]
+    }
+    s3.put_bucket_policy(Bucket=bucket_name, Policy=json.dumps(bucket_policy))
+    return
 
+'''
+object_key = 'objects-key'
+acl = 'private', 'public-read', 'public-read-write', etc.
+'''
+def set_object_acl(object_key, acl, bucket_name):
+    object_key = object_key
+    acl = acl
+    s3.put_object_acl(Bucket=bucket_name, Key=object_key, ACL=acl)
+    return
+
+'''
+username = 'your-iam-user'
+bucket_arn = f'arn:aws:s3:::{bucket_name}/*'
+policy_document = {
+    "Version": "2012-10-17",
+    "Statement": [
+        {
+            "Effect": "Allow",
+            "Action": "s3:GetObject",
+            "Resource": bucket_arn
+        }
+    ]
+}
+'''
+def set_iam_policies(username, policy_document, bucket_arn):
+    iam = boto3.client('iam')
+    policy_arn = iam.create_policy(
+        PolicyName='S3AccessPolicy',
+        PolicyDocument=json.dumps(policy_document)
+    )['Policy']['Arn']
+
+    iam.attach_user_policy(UserName=username, PolicyArn=policy_arn)
+    return
         
+def generate_presigned_url(bucket_name, object_key, expiration=3600):
+    """
+    Generate a presigned URL for temporary access to an S3 object.
 
+    :param bucket_name: The name of the S3 bucket.
+    :param object_key: The key of the S3 object.
+    :param expiration: The expiration time of the URL in seconds (default is 1 hour).
+    :return: The presigned URL.
+    """
+    s3_client = boto3.client('s3')
 
-        
+    try:
+        presigned_url = s3_client.generate_presigned_url(
+            'get_object',
+            Params={'Bucket': bucket_name, 'Key': object_key},
+            ExpiresIn=expiration
+        )
+        return presigned_url
+    except NoCredentialsError:
+        return None
